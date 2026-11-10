@@ -1,0 +1,84 @@
+name: Compile LaTeX
+
+on:
+  push:
+    branches: [main]
+    paths: ['**.tex', '**.asy', '**.bib', '**.sty', '**.cls', 'latexmkrc']
+  workflow_dispatch:
+    inputs:
+      file:
+        description: 'Path of one .tex file to compile (leave blank for all)'
+        required: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: compile
+  cancel-in-progress: true
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Pick the files to compile
+        env:
+          ONE_FILE: ${{ inputs.file }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          : > changed.txt
+          if [ -n "$ONE_FILE" ]; then
+            echo "$ONE_FILE" > changed.txt
+          elif [ "$EVENT" = "push" ]; then
+            git diff --name-only HEAD~1 HEAD -- '*.tex' > changed.txt 2>/dev/null || true
+          fi
+          if [ ! -s changed.txt ]; then git ls-files '*.tex' > changed.txt; fi
+          : > roots.txt
+          while IFS= read -r f; do
+            [ -f "$f" ] || continue
+            if grep -q '^[^%]*\\documentclass' "$f"; then
+              echo "$f" >> roots.txt
+            else
+              grep -l '^[^%]*\\documentclass' "$(dirname "$f")"/*.tex >> roots.txt 2>/dev/null || true
+            fi
+          done < changed.txt
+          sort -u roots.txt -o roots.txt
+          echo "Will compile:"; cat roots.txt
+
+      - name: Compile
+        run: |
+          cat > /tmp/compile.sh <<'EOF'
+          set -u
+          apt-get update -qq
+          apt-get install -y -qq ghostscript fonts-noto-cjk > /dev/null
+          mkdir -p /work/out
+          status=0
+          while IFS= read -r f; do
+            dir=$(dirname "$f"); base=$(basename "$f" .tex)
+            if grep -qE '^[^%]*(ctex|xeCJK|fontspec)' "$f"; then engine=-xelatex; else engine=-pdf; fi
+            echo "::group::Compiling $f ($engine)"
+            start=$(date +%s)
+            (cd "$dir" && latexmk $engine -r /work/latexmkrc -interaction=nonstopmode -file-line-error "$base.tex") || status=1
+            echo "::endgroup::"
+            echo "$f took $(( $(date +%s) - start )) seconds"
+            mkdir -p "/work/out/$dir"
+            cp "$dir/$base.pdf" "/work/out/$dir/" 2>/dev/null || true
+            cp "$dir/$base.log" "/work/out/$dir/" 2>/dev/null || true
+          done < /work/roots.txt
+          exit $status
+          EOF
+          docker run --rm -v "$PWD":/work -v /tmp/compile.sh:/compile.sh -w /work texlive/texlive:latest bash /compile.sh
+
+      - name: Publish PDFs to the pdf branch
+        if: always()
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./out
+          publish_branch: pdf
+          keep_files: true
