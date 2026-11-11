@@ -1,7 +1,10 @@
 # own_overleaf
 
-My LaTeX projects. Every time a `.tex` file changes on `main`, GitHub Actions compiles it.
+My own LaTeX editor and compiler.
 
-- **Edit:** press `.` on the repo page to open the web editor, then commit.
-- **Get the PDF:** switch the branch dropdown from `main` to `pdf`. The `.log` file sits next to each PDF.
+- **Editor:** https://laindingoldlee.github.io/own_overleaf/ (file tree, editor, PDF preview, Compile button).
+- **How it works:** the editor saves files to this repository and asks GitHub Actions to compile them. PDFs and logs are stored on the `pdf` branch.
 - **Engine:** XeLaTeX if the file loads `ctex`, `xeCJK` or `fontspec`; pdfLaTeX otherwise. Asymptote diagrams run automatically.
+- **Chinese:** use `\usepackage[UTF8,fontset=none]{ctex}` with `\setCJKmainfont{Noto Serif CJK TC}`, and `\usepackage[inline]{asymptote}` for Chinese inside diagrams. See `chinese-test/main.tex`.
+
+The editor's code is `docs/index.html`. The compiler is `.github/workflows/compile.yml`.

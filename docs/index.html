@@ -210,7 +210,9 @@ const TEMPLATE = String.raw`\documentclass[11pt,a4paper]{article}
 \usepackage{asymptote}
 
 % For Chinese (Traditional and Simplified), remove the "% " from the next
-% two lines. The compiler then switches to XeLaTeX by itself.
+% two lines. The compiler then switches to XeLaTeX by itself. If you want
+% Chinese inside diagrams too, change the line above to
+% \usepackage[inline]{asymptote}
 % \usepackage[UTF8,fontset=none]{ctex}
 % \setCJKmainfont{Noto Serif CJK TC} \setCJKsansfont{Noto Sans CJK TC} \setCJKmonofont{Noto Sans Mono CJK TC}
 
@@ -439,6 +441,7 @@ function moveEntry(from, to) {      // works for saved and unsaved files
   if (docs.has(from)) { docs.set(to, docs.get(from)); docs.delete(from); const t = docs.get(to).getValue(); if (originals.get(to) !== t) pending.set(to, { type: 'text', content: t }); }
   originals.delete(from);
   if (openPath === from) { openPath = to; $('#edPath').textContent = to; }
+  let d = dirOf(to); while (d) { openDirs.add(d); d = dirOf(d); }
 }
 function removeEntry(path) {
   if (tree.has(path)) pending.set(path, { type: 'delete' }); else pending.delete(path);
@@ -519,7 +522,8 @@ function mainTarget() {
   if (openPath && /\.tex$/i.test(openPath) && docs.has(openPath) && isRootTex(docs.get(openPath).getValue())) return openPath;
   const mains = JSON.parse(localStorage.getItem('oo_mains') || '{}');
   let d = openPath ? dirOf(openPath) : selDir;
-  for (;;) { if (mains[d] && effective().has(mains[d])) return mains[d]; if (!d) break; d = dirOf(d); }
+  const files = effective();
+  for (;;) { if (mains[d] && files.has(mains[d])) return mains[d]; if (files.has(join(d, 'main.tex'))) return join(d, 'main.tex'); if (!d) break; d = dirOf(d); }
   return null;
 }
 function updateMainInfo() { const t = mainTarget(); $('#mainInfo').textContent = t && t !== openPath ? 'Compile builds ' + t : ''; }
