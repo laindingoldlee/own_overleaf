@@ -1,4 +1,4 @@
-This is XeTeX, Version 3.141592653-2.6-0.999998 (TeX Live 2026) (preloaded format=xelatex 2026.11.1)  11 NOV 2026 09:58
+This is XeTeX, Version 3.141592653-2.6-0.999998 (TeX Live 2026) (preloaded format=xelatex 2026.11.1)  11 NOV 2026 10:03
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -132,13 +132,14 @@ LaTeX Font Info:    Overwriting math alphabet `\mathfrak' in version `bold'
 (/usr/local/texlive/2026/texmf-dist/tex/latex/asymptote/asymptote.sty
 Package: asymptote 2024/02/26 v1.38 Asymptote style file for LaTeX
 
-(./main.pre)
+(./main.pre (./main-1.pre))
 \ASYbox=\box55
 \ASYdimen=\dimen168
 \c@asy=\count296
 \AsyStream=\write3
 \AsyPreStream=\write4
- (/usr/local/texlive/2026/texmf-dist/tex/latex/base/ifthen.sty
+
+(/usr/local/texlive/2026/texmf-dist/tex/latex/base/ifthen.sty
 Package: ifthen 2026-06-01 v1.1e Standard LaTeX ifthen package (DPC)
 )
 (/usr/local/texlive/2026/texmf-dist/tex/latex/graphics/graphicx.sty
@@ -764,9 +765,11 @@ File: umsb.fd 2013/01/14 v3.01 AMS symbols B
 )
 \openout3 = `main-1.asy'.
 
-File: main-1.pdf Graphic file (type pdf)
-<use main-1.pdf>
- [1
+ (./main-1.tex
+File: main-1_0.pdf Graphic file (type pdf)
+<use main-1_0.pdf>
+)
+[1
 
 ] (./main.aux)
  ***********
@@ -775,12 +778,12 @@ L3 programming layer <2026/08/11>
  ***********
  ) 
 Here is how much of TeX's memory you used:
- 8969 strings out of 467614
- 232291 string characters out of 5417486
- 681126 words of memory out of 5000000
- 38127 multiletter control sequences out of 15000+600000
- 634931 words of font info for 79 fonts, out of 8000000 for 9000
+ 8999 strings out of 467614
+ 232732 string characters out of 5417486
+ 683372 words of memory out of 5000000
+ 38150 multiletter control sequences out of 15000+600000
+ 636484 words of font info for 86 fonts, out of 8000000 for 9000
  1348 hyphenation exceptions out of 8191
  93i,5n,96p,450b,283s stack positions out of 10000i,1000n,20000p,200000b,200000s
 
-Output written on main.xdv (1 page, 3404 bytes).
+Output written on main.xdv (1 page, 4584 bytes).
