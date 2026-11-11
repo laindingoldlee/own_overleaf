@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>My LaTeX</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css" integrity="sha384-zaeBlB/vwYsDRSlFajnDd7OydJ0cWk+c2OWybl3eSUf6hW2EbhlCsQPqKr3gkznT" crossorigin="anonymous">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/dialog/dialog.min.css" integrity="sha384-MomRjC6IKuGHk2XIFKXAwFx0gytd6+ZsF9pnFM3JWZV5izBqPgoLapxRqG1h5IKm" crossorigin="anonymous">
+<style>
+  :root {
+    --bar: #1f2a37; --bar-text: #e6edf3; --side: #263445; --side-text: #d5dde6; --side-hover: #33455b;
+    --side-active: #3f5a78; --line: #d0d7de; --bg: #f4f6f8; --green: #2e8b57; --green-dark: #24704a;
+    --red: #c0392b; --muted: #6b7785; --paper: #ffffff;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { font: 14px/1.4 system-ui, -apple-system, "Segoe UI", "Noto Sans TC", "PingFang TC", sans-serif; color: #1c2430; background: var(--bg); display: flex; flex-direction: column; overflow: hidden; }
+  button { font: inherit; cursor: pointer; }
+  .hidden { display: none !important; }
+
+  /* top bar */
+  #bar { background: var(--bar); color: var(--bar-text); display: flex; align-items: center; gap: 10px; padding: 8px 12px; flex: none; }
+  #bar .title { font-weight: 600; font-size: 15px; margin-right: 6px; white-space: nowrap; }
+  #bar .spacer { flex: 1; }
+  #status { color: #b8c4d0; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  #status.err { color: #ffb4a8; }
+  #status.ok { color: #a6e3b8; }
+  .btn { border: 1px solid transparent; border-radius: 6px; padding: 6px 12px; background: #3a4a5e; color: #fff; white-space: nowrap; }
+  .btn:hover { background: #47596f; }
+  .btn:disabled { opacity: .55; cursor: default; }
+  #compileBtn { background: var(--green); font-weight: 700; font-size: 15px; padding: 8px 22px; }
+  #compileBtn:hover:not(:disabled) { background: var(--green-dark); }
+  #saveBtn.dirty { background: #b7791f; }
+  .btn.ghost { background: transparent; border-color: #4a5b70; color: #c9d4df; }
+  #viewTabs { display: none; gap: 4px; }
+  #viewTabs button { background: transparent; border: 1px solid #4a5b70; color: #c9d4df; border-radius: 6px; padding: 5px 10px; }
+  #viewTabs button.on { background: #4a5b70; color: #fff; }
+
+  /* layout */
+  #main { flex: 1; display: flex; min-height: 0; }
+  #side { width: 250px; background: var(--side); color: var(--side-text); display: flex; flex-direction: column; flex: none; min-width: 140px; }
+  #sideTools { display: flex; gap: 4px; padding: 8px; border-bottom: 1px solid #1b2531; flex-wrap: wrap; }
+  #sideTools button { background: #34475c; color: #e3eaf1; border: 0; border-radius: 5px; padding: 5px 8px; font-size: 12.5px; }
+  #sideTools button:hover { background: #40566f; }
+  #tree { flex: 1; overflow: auto; padding: 6px 0 20px; }
+  .row { display: flex; align-items: center; gap: 6px; padding: 4px 8px; cursor: pointer; white-space: nowrap; user-select: none; }
+  .row:hover { background: var(--side-hover); }
+  .row.active { background: var(--side-active); color: #fff; }
+  .row.seldir { box-shadow: inset 3px 0 0 #6fa8dc; }
+  .row .ico { width: 16px; text-align: center; flex: none; opacity: .85; font-size: 12px; }
+  .row .name { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+  .row .dot { color: #f6c453; font-size: 18px; line-height: 10px; }
+  .row .acts { display: none; gap: 2px; }
+  .row:hover .acts, .row.active .acts { display: flex; }
+  .row .acts button { background: transparent; border: 0; color: #c7d2dd; padding: 0 4px; border-radius: 4px; font-size: 13px; }
+  .row .acts button:hover { background: #50667f; color: #fff; }
+  .grip { width: 6px; cursor: col-resize; background: var(--line); flex: none; }
+  .grip:hover, .grip.drag { background: #8fb3d9; }
+  #edPane { flex: 1 1 50%; min-width: 180px; display: flex; flex-direction: column; background: var(--paper); }
+  #edHead, #pdfHead { display: flex; align-items: center; gap: 8px; padding: 5px 10px; border-bottom: 1px solid var(--line); background: #eef1f4; font-size: 13px; color: #3b4755; flex: none; min-height: 34px; }
+  #edHead .path { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #edBody { flex: 1; min-height: 0; position: relative; }
+  .CodeMirror { height: 100%; font: 13.5px/1.5 ui-monospace, "SF Mono", Menlo, Consolas, "Noto Sans Mono CJK TC", monospace; }
+  .CodeMirror-activeline-background { background: #f2f7fc; }
+  #edEmpty, #binView { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; color: var(--muted); padding: 30px; background: var(--paper); overflow: auto; }
+  #binView img { max-width: 100%; max-height: 100%; }
+  #pdfPane { flex: 1 1 50%; min-width: 180px; display: flex; flex-direction: column; background: #dfe3e8; }
+  #pdfHead .tabs { display: flex; gap: 4px; }
+  #pdfHead .tabs button, #pdfHead .tool { background: transparent; border: 1px solid transparent; border-radius: 5px; padding: 3px 9px; color: #3b4755; }
+  #pdfHead .tabs button.on { background: #fff; border-color: var(--line); font-weight: 600; }
+  #pdfHead .tool { border-color: var(--line); background: #fff; }
+  #pdfHead .tool:hover { background: #f3f6f9; }
+  #errCount { background: var(--red); color: #fff; border-radius: 9px; padding: 0 6px; font-size: 11px; margin-left: 4px; }
+  #pdfpages { flex: 1; overflow: auto; padding: 12px; }
+  #pdfpages .page { background: #fff; margin: 0 auto 12px; box-shadow: 0 1px 4px rgba(0,0,0,.25); }
+  #pdfpages .page canvas { display: block; width: 100%; height: 100%; }
+  #pdfMsg { flex: 1; display: flex; align-items: center; justify-content: center; text-align: center; color: var(--muted); padding: 30px; }
+  #logView { flex: 1; overflow: auto; background: #fff; padding: 10px 12px; }
+  #logErrors .e { border-left: 4px solid var(--red); background: #fdf1ef; padding: 6px 10px; margin: 0 0 6px; border-radius: 0 5px 5px 0; cursor: pointer; }
+  #logErrors .e b { color: var(--red); }
+  #logErrors .okmsg { border-left: 4px solid var(--green); background: #eef8f1; padding: 6px 10px; border-radius: 0 5px 5px 0; }
+  #logRaw { white-space: pre-wrap; word-break: break-word; font: 12px/1.45 ui-monospace, Menlo, Consolas, monospace; color: #333; margin-top: 12px; }
+
+  /* setup + dialogs */
+  #setup { position: fixed; inset: 0; background: var(--bg); display: flex; align-items: flex-start; justify-content: center; overflow: auto; padding: 30px 16px; z-index: 50; }
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 22px 24px; max-width: 560px; width: 100%; box-shadow: 0 4px 18px rgba(0,0,0,.06); }
+  .card h1 { font-size: 20px; margin: 0 0 6px; }
+  .card h2 { font-size: 15px; margin: 0 0 12px; }
+  .card p, .card li { color: #3b4755; }
+  .card ol { padding-left: 20px; }
+  .card label { display: block; font-weight: 600; margin: 12px 0 4px; }
+  .card input[type=text], .card input[type=password] { width: 100%; padding: 8px 10px; border: 1px solid #b8c2cc; border-radius: 6px; font: inherit; }
+  .card .check { display: flex; gap: 8px; align-items: center; font-weight: 400; }
+  .card .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+  .card .btn.primary { background: var(--green); }
+  .card .btn.danger { background: var(--red); }
+  .card .btn.plain { background: #e8ecf0; color: #1c2430; }
+  .card .error { color: var(--red); margin-top: 10px; }
+  #modal { position: fixed; inset: 0; background: rgba(20,28,38,.45); display: flex; align-items: center; justify-content: center; z-index: 60; padding: 16px; }
+  #modal .card { max-width: 420px; }
+
+  @media (max-width: 900px) {
+    #viewTabs { display: flex; }
+    .grip { display: none; }
+    #side, #edPane, #pdfPane { display: none; width: auto !important; flex: 1 1 auto !important; }
+    body[data-view=files] #side, body[data-view=code] #edPane, body[data-view=pdf] #pdfPane { display: flex; }
+    #bar .title, #signOutBtn { display: none; }
+    #compileBtn { padding: 8px 14px; }
+  }
+</style>
+</head>
+<body data-view="code">
+
+<div id="bar">
+  <span class="title">My LaTeX</span>
+  <div id="viewTabs">
+    <button data-v="files">Files</button><button data-v="code" class="on">Code</button><button data-v="pdf">PDF</button>
+  </div>
+  <button id="compileBtn" class="btn" title="Save and compile (Ctrl/Cmd + Enter)">▶ Compile</button>
+  <button id="saveBtn" class="btn" title="Save without compiling (Ctrl/Cmd + S)">Save</button>
+  <span id="status"></span>
+  <span class="spacer"></span>
+  <button id="signOutBtn" class="btn ghost">Sign out</button>
+</div>
+
+<div id="main">
+  <div id="side">
+    <div id="sideTools">
+      <button id="newProjBtn" title="New folder with a starter main.tex">+ Project</button>
+      <button id="newFileBtn">+ File</button>
+      <button id="newFolderBtn">+ Folder</button>
+      <button id="uploadBtn">Upload</button>
+      <input id="uploadInput" type="file" multiple class="hidden">
+    </div>
+    <div id="tree"></div>
+  </div>
+  <div class="grip" data-target="side"></div>
+  <div id="edPane">
+    <div id="edHead"><span class="path" id="edPath">No file open</span><span class="spacer" style="flex:1"></span><span id="mainInfo"></span></div>
+    <div id="edBody">
+      <textarea id="cm"></textarea>
+      <div id="binView" class="hidden"></div>
+      <div id="edEmpty">Pick a file on the left to start editing.</div>
+    </div>
+  </div>
+  <div class="grip" data-target="edPane"></div>
+  <div id="pdfPane">
+    <div id="pdfHead">
+      <div class="tabs"><button id="tabPdf" class="on">PDF</button><button id="tabLog">Log<span id="errCount" class="hidden"></span></button></div>
+      <span style="flex:1"></span>
+      <button class="tool" id="zoomOut" title="Zoom out">−</button>
+      <button class="tool" id="zoomIn" title="Zoom in">+</button>
+      <a class="tool" id="dlBtn" style="text-decoration:none" title="Download the PDF">Download</a>
+    </div>
+    <div id="pdfMsg">Open a .tex file and press <b>&nbsp;Compile&nbsp;</b> to see the PDF here.</div>
+    <div id="pdfpages" class="hidden"></div>
+    <div id="logView" class="hidden"><div id="logErrors"></div><div id="logRaw"></div></div>
+  </div>
+</div>
+
+<div id="setup" class="hidden">
+  <div class="card">
+    <h1>My LaTeX</h1>
+    <p>This page edits and compiles the LaTeX files stored in your GitHub repository. To let it in, it needs a GitHub access key (a "token") that only works for that one repository.</p>
+    <ol>
+      <li>Open <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">github.com → Settings → Fine-grained tokens → Generate new token</a>.</li>
+      <li>Give it any name and pick an expiry date.</li>
+      <li>Under <b>Repository access</b>, choose <b>Only select repositories</b> and pick your LaTeX repository.</li>
+      <li>Under <b>Permissions → Repository permissions</b>, set <b>Contents</b> to <b>Read and write</b> and <b>Actions</b> to <b>Read and write</b>.</li>
+      <li>Click <b>Generate token</b>, copy it, and paste it below.</li>
+    </ol>
+    <label for="repoInput">Repository</label>
+    <input id="repoInput" type="text" placeholder="owner/repository" autocomplete="off" spellcheck="false">
+    <label for="tokenInput">Access token</label>
+    <input id="tokenInput" type="password" placeholder="github_pat_..." autocomplete="off" spellcheck="false">
+    <label class="check"><input id="rememberInput" type="checkbox" checked> Remember me on this device (untick on shared computers)</label>
+    <div id="setupErr" class="error"></div>
+    <div class="actions"><button id="setupGo" class="btn primary">Open my files</button></div>
+  </div>
+</div>
+
+<div id="modal" class="hidden">
+  <div class="card">
+    <h2 id="mTitle"></h2>
+    <p id="mText"></p>
+    <input id="mInput" type="text" autocomplete="off" spellcheck="false">
+    <div class="actions"><button id="mCancel" class="btn plain">Cancel</button><button id="mOk" class="btn primary">OK</button></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js" integrity="sha384-ZYmwuq4n2gOcNxMSiJ6jyTj+BbIrilr7p6dlq6q5nmSWKmsH9UU4K1qqjycMkfmR" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/stex/stex.min.js" integrity="sha384-n2wtKiiFdL2aVjOQU5/wAHr99MFhapi3cCgkCmuoYubaWJEBZ4pJQKZvwtPBC6Zj" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js" integrity="sha384-LjCI3E8qhhxXZvu7+FCvqx9eZYSowFvuJ7z54KsgI/BDPGKEuysqCg/vYiKHvC4Y" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/selection/active-line.min.js" integrity="sha384-hcxaXyAtJ30s2NeDu1OHWsQRiHiWuYLTbI596+YFb+f2pFhzO0mDuahZziRPPDxg" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/dialog/dialog.min.js" integrity="sha384-3COleknUtlGKoEOR9Wm7WKVRyS6ljwYU2x1ebD8nd6ujaLMqwY+q3F8+yDcefbXr" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/search/searchcursor.min.js" integrity="sha384-ILkploZWukdp1VMmzMnE+32H0mgy2e+w29evc4grALGOqIRGBgbBGrwkX7a6zK7y" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/search/search.min.js" integrity="sha384-v64L7YTJ/ullw5v36qIJcvWAxuEnRGu9E326vUV3Ro7sx4HCZHIDTphKO53htazT" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" integrity="sha384-/1qUCSGwTur9vjf/z9lmu/eCUYbpOTgSjmpbMQZ1/CtX2v/WcAIKqRv+U1DUCG6e" crossorigin="anonymous"></script>
+<script>
+'use strict';
+const PDF_WORKER = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+const FALLBACK_REPO = 'laindingoldlee/own_overleaf';
+const WORKFLOW = 'compile.yml';
+const BRANCH = 'main', PDF_BRANCH = 'pdf';
+const TEXT_EXT = /\.(tex|sty|cls|bib|bst|asy|txt|md|csv|tikz|def|cfg|ltx|dtx|ins|yml|yaml|json)$/i;
+const IMG_EXT = /\.(png|jpe?g|gif|svg|webp)$/i;
+const TEMPLATE = String.raw`\documentclass[11pt,a4paper]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{asymptote}
+
+% For Chinese (Traditional and Simplified), remove the "% " from the next
+% two lines. The compiler then switches to XeLaTeX by itself.
+% \usepackage[UTF8,fontset=none]{ctex}
+% \setCJKmainfont{Noto Serif CJK TC} \setCJKsansfont{Noto Sans CJK TC} \setCJKmonofont{Noto Sans Mono CJK TC}
+
+\title{Title}
+\author{Lee}
+\date{}
+
+\begin{document}
+\maketitle
+
+Start writing here.
+
+\end{document}
+`;
+
+const $ = s => document.querySelector(s);
+let cfg = null;                 // {token, repo}
+let headSha = null;             // commit the page last synced with
+let tree = new Map();           // path -> blob sha (as on GitHub)
+const pending = new Map();      // path -> {type:'text'|'b64'|'sha'|'delete', content|sha}
+const originals = new Map();    // path -> text as on GitHub
+const docs = new Map();         // path -> CodeMirror.Doc
+let openPath = null, selDir = '', busy = false;
+let openDirs = new Set(JSON.parse(localStorage.getItem('oo_open') || '[]'));
+let editor, suppress = false;
+
+/* ---------- small helpers ---------- */
+const dirOf = p => p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '';
+const baseOf = p => p.slice(p.lastIndexOf('/') + 1);
+const join = (d, n) => (d ? d + '/' : '') + n;
+const encPath = p => p.split('/').map(encodeURIComponent).join('/');
+const isHidden = p => p.startsWith('.') || p.startsWith('docs/') || p === 'latexmkrc' || p === 'README.md' || baseOf(p) === '.gitkeep' && false;
+const isRootTex = text => /^[^%\n]*\\documentclass/m.test(text);
+function setStatus(msg, cls) { const s = $('#status'); s.textContent = msg || ''; s.className = cls || ''; s.title = msg || ''; }
+function b64FromBytes(bytes) { let s = ''; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000)); return btoa(s); }
+const b64FromText = t => b64FromBytes(new TextEncoder().encode(t));
+function cleanPath(p) {
+  p = (p || '').trim().replace(/\\/g, '/').replace(/^\/+|\/+$/g, '').replace(/\/{2,}/g, '/');
+  if (!p || p.split('/').some(s => s === '.' || s === '..' || !s.trim())) return null;
+  return p;
+}
+
+async function gh(path, opts = {}) {
+  const headers = { Accept: opts.accept || 'application/vnd.github+json', Authorization: 'Bearer ' + cfg.token, 'X-GitHub-Api-Version': '2022-11-28' };
+  if (opts.body) headers['Content-Type'] = 'application/json';
+  const r = await fetch('https://api.github.com/repos/' + cfg.repo + path, { method: opts.method || 'GET', headers, body: opts.body ? JSON.stringify(opts.body) : undefined, cache: 'no-store' });
+  if (!r.ok && !(opts.allow404 && r.status === 404)) {
+    let msg = r.status + ' ' + r.statusText;
+    try { const j = await r.json(); if (j.message) msg = j.message + ' (' + r.status + ')'; } catch (e) {}
+    const err = new Error(msg); err.status = r.status; throw err;
+  }
+  return r;
+}
+const ghJson = async (path, opts) => (await gh(path, opts)).json();
+
+/* ---------- dialogs ---------- */
+function dialog({ title, text = '', value = null, ok = 'OK', danger = false }) {
+  return new Promise(resolve => {
+    $('#mTitle').textContent = title; $('#mText').textContent = text;
+    const inp = $('#mInput'), okB = $('#mOk');
+    inp.classList.toggle('hidden', value === null); inp.value = value || '';
+    okB.textContent = ok; okB.className = 'btn ' + (danger ? 'danger' : 'primary');
+    $('#modal').classList.remove('hidden');
+    const done = v => { $('#modal').classList.add('hidden'); okB.onclick = $('#mCancel').onclick = inp.onkeydown = null; resolve(v); };
+    okB.onclick = () => done(value === null ? true : inp.value);
+    $('#mCancel').onclick = () => done(null);
+    inp.onkeydown = e => { if (e.key === 'Enter') okB.onclick(); if (e.key === 'Escape') done(null); };
+    if (value !== null) { inp.focus(); const dot = inp.value.lastIndexOf('.'); const sl = inp.value.lastIndexOf('/') + 1; inp.setSelectionRange(sl, dot > sl ? dot : inp.value.length); } else okB.focus();
+  });
+}
+
+/* ---------- sign in ---------- */
+function defaultRepo() {
+  const h = location.hostname;
+  if (h.endsWith('.github.io')) { const seg = location.pathname.split('/').filter(Boolean)[0]; if (seg) return h.split('.')[0] + '/' + seg; }
+  return FALLBACK_REPO;
+}
+function loadCfg() { try { return JSON.parse(sessionStorage.getItem('oo_cfg') || localStorage.getItem('oo_cfg') || 'null'); } catch (e) { return null; } }
+function showSetup(msg) {
+  $('#setup').classList.remove('hidden');
+  $('#repoInput').value = (cfg && cfg.repo) || defaultRepo();
+  $('#setupErr').textContent = msg || '';
+}
+$('#setupGo').onclick = async () => {
+  const repo = $('#repoInput').value.trim().replace(/^https:\/\/github\.com\//, '').replace(/\/+$/, ''), token = $('#tokenInput').value.trim();
+  if (!/^[^/\s]+\/[^/\s]+$/.test(repo)) { $('#setupErr').textContent = 'Write the repository as owner/name.'; return; }
+  if (!token) { $('#setupErr').textContent = 'Paste your access token.'; return; }
+  cfg = { repo, token };
+  $('#setupErr').textContent = 'Checking…';
+  try {
+    const info = await ghJson('');
+    if (info.permissions && !info.permissions.push) throw new Error('This token can read the repository but not write to it. Set Contents to "Read and write".');
+  } catch (e) { $('#setupErr').textContent = 'That did not work: ' + e.message; return; }
+  ($('#rememberInput').checked ? localStorage : sessionStorage).setItem('oo_cfg', JSON.stringify(cfg));
+  $('#tokenInput').value = ''; $('#setup').classList.add('hidden');
+  start();
+};
+$('#signOutBtn').onclick = async () => {
+  if (pending.size && !await dialog({ title: 'Sign out?', text: 'You have unsaved changes. They will be lost.', ok: 'Sign out', danger: true })) return;
+  localStorage.removeItem('oo_cfg'); sessionStorage.removeItem('oo_cfg'); pending.clear(); location.reload();
+};
+
+/* ---------- file tree ---------- */
+async function loadTree() {
+  const ref = await ghJson('/git/ref/heads/' + BRANCH);
+  headSha = ref.object.sha;
+  const t = await ghJson('/git/trees/' + headSha + '?recursive=1');
+  tree = new Map(t.tree.filter(e => e.type === 'blob').map(e => [e.path, e.sha]));
+}
+function effective() {       // files as the user sees them: GitHub + unsaved changes
+  const m = new Map();
+  for (const [p, sha] of tree) if (!isHidden(p)) m.set(p, { sha });
+  for (const [p, c] of pending) { if (c.type === 'delete') m.delete(p); else m.set(p, { sha: tree.get(p), dirty: true }); }
+  return m;
+}
+function renderTree() {
+  const files = effective(), root = { dirs: new Map(), files: [] };
+  for (const p of [...files.keys()].sort((a, b) => a.localeCompare(b))) {
+    const parts = p.split('/'); let node = root, acc = '';
+    for (let i = 0; i < parts.length - 1; i++) { acc = join(acc, parts[i]); if (!node.dirs.has(parts[i])) node.dirs.set(parts[i], { path: acc, dirs: new Map(), files: [] }); node = node.dirs.get(parts[i]); }
+    if (parts[parts.length - 1] !== '.gitkeep') node.files.push(p);
+  }
+  const el = $('#tree'); el.innerHTML = '';
+  const mkBtn = (label, title, fn) => { const b = document.createElement('button'); b.textContent = label; b.title = title; b.onclick = e => { e.stopPropagation(); fn(); }; return b; };
+  const addRow = (depth, ico, name, cls, onclick, acts, dirty) => {
+    const r = document.createElement('div'); r.className = 'row ' + cls; r.style.paddingLeft = (8 + depth * 14) + 'px';
+    const i = document.createElement('span'); i.className = 'ico'; i.textContent = ico;
+    const n = document.createElement('span'); n.className = 'name'; n.textContent = name; n.title = name;
+    r.append(i, n);
+    if (dirty) { const d = document.createElement('span'); d.className = 'dot'; d.textContent = '•'; d.title = 'Not saved yet'; r.append(d); }
+    const a = document.createElement('span'); a.className = 'acts'; a.append(...acts); r.append(a);
+    r.onclick = onclick; el.append(r);
+  };
+  const walk = (node, depth) => {
+    for (const [name, d] of [...node.dirs].sort((a, b) => a[0].localeCompare(b[0]))) {
+      const open = openDirs.has(d.path);
+      addRow(depth, open ? '▾' : '▸', name, 'dir' + (selDir === d.path ? ' seldir' : ''), () => {
+        if (open && selDir === d.path) openDirs.delete(d.path); else openDirs.add(d.path);
+        selDir = d.path; localStorage.setItem('oo_open', JSON.stringify([...openDirs])); renderTree();
+      }, [mkBtn('✎', 'Rename folder', () => renameDir(d.path)), mkBtn('🗑', 'Delete folder', () => deleteDir(d.path))]);
+      if (open) walk(d, depth + 1);
+    }
+    for (const p of node.files) {
+      addRow(depth, /\.tex$/i.test(p) ? '📄' : IMG_EXT.test(p) ? '🖼' : '·', baseOf(p), p === openPath ? 'active' : '', () => openFile(p),
+        [mkBtn('✎', 'Rename', () => renameFile(p)), mkBtn('🗑', 'Delete', () => deleteFile(p))], files.get(p).dirty);
+    }
+  };
+  walk(root, 0);
+  if (!files.size) el.innerHTML = '<div style="padding:14px;color:#9fb0c2">No files yet. Press “+ Project” to start.</div>';
+  const n = pending.size, sb = $('#saveBtn');
+  sb.textContent = n ? 'Save (' + n + ')' : 'Saved'; sb.classList.toggle('dirty', !!n); sb.disabled = !n || busy;
+}
+
+/* ---------- opening and editing ---------- */
+async function fetchBlobBytes(sha) { return new Uint8Array(await (await gh('/git/blobs/' + sha, { accept: 'application/vnd.github.raw+json' })).arrayBuffer()); }
+async function openFile(path, line) {
+  const files = effective(); if (!files.has(path)) return;
+  selDir = dirOf(path);
+  let d = selDir; while (d) { openDirs.add(d); d = dirOf(d); }
+  const isText = TEXT_EXT.test(path) || !baseOf(path).includes('.');
+  $('#edEmpty').classList.add('hidden');
+  if (!isText) {
+    openPath = path; $('#edPath').textContent = path; renderTree(); updateMainInfo();
+    const v = $('#binView'); v.classList.remove('hidden'); v.textContent = 'Loading…';
+    try {
+      const p = pending.get(path);
+      if (IMG_EXT.test(path)) {
+        const bytes = p && p.type === 'b64' ? Uint8Array.from(atob(p.content), c => c.charCodeAt(0)) : await fetchBlobBytes(p && p.type === 'sha' ? p.sha : tree.get(path));
+        const type = /\.svg$/i.test(path) ? 'image/svg+xml' : 'image/' + path.split('.').pop().toLowerCase().replace('jpg', 'jpeg');
+        const img = new Image(); img.src = URL.createObjectURL(new Blob([bytes], { type })); v.textContent = ''; v.append(img);
+      } else v.textContent = baseOf(path) + ' is not a text file, so it cannot be edited here. It is still used when you compile.';
+    } catch (e) { v.textContent = 'Could not load this file: ' + e.message; }
+    return;
+  }
+  if (!docs.has(path)) {
+    setStatus('Opening ' + baseOf(path) + '…');
+    try {
+      const p = pending.get(path); let text, orig = null;
+      if (p && p.type === 'text') { text = p.content; orig = originals.has(path) ? originals.get(path) : null; }
+      else { text = new TextDecoder().decode(await fetchBlobBytes(p && p.type === 'sha' ? p.sha : tree.get(path))); if (!p) orig = text; }
+      if (orig !== null) originals.set(path, orig);
+      docs.set(path, CodeMirror.Doc(text, /\.(tex|sty|cls|ltx|tikz|def)$/i.test(path) ? 'stex' : null));
+      setStatus('');
+    } catch (e) { setStatus('Could not open ' + path + ': ' + e.message, 'err'); return; }
+  }
+  $('#binView').classList.add('hidden');
+  openPath = path; $('#edPath').textContent = path;
+  suppress = true; editor.swapDoc(docs.get(path)); suppress = false;
+  editor.setOption('readOnly', false);
+  if (line) { editor.setCursor(line - 1, 0); editor.scrollIntoView({ line: line - 1, ch: 0 }, 150); }
+  editor.focus(); renderTree(); updateMainInfo();
+  localStorage.setItem('oo_last', path);
+  if (/\.tex$/i.test(path) && isRootTex(editor.getValue()) && shownPdfFor !== path) loadOutput(path, true);
+}
+function onEdit() {
+  if (suppress || !openPath) return;
+  const text = editor.getValue(), had = pending.has(openPath);
+  if (originals.get(openPath) === text) pending.delete(openPath); else pending.set(openPath, { type: 'text', content: text });
+  if (had !== pending.has(openPath)) renderTree();
+  updateMainInfo();
+}
+
+/* ---------- file operations (all staged until Save / Compile) ---------- */
+async function newFile() {
+  const name = await dialog({ title: 'New file', text: 'File name' + (selDir ? ' (inside ' + selDir + ')' : ''), value: join(selDir, 'new.tex'), ok: 'Create' });
+  const path = cleanPath(name); if (!path) return;
+  if (effective().has(path)) { setStatus(path + ' already exists.', 'err'); return; }
+  pending.set(path, { type: 'text', content: '' }); renderTree(); openFile(path);
+}
+async function newFolder() {
+  const name = await dialog({ title: 'New folder', text: 'Folder name' + (selDir ? ' (inside ' + selDir + ')' : ''), value: join(selDir, 'folder'), ok: 'Create' });
+  const path = cleanPath(name); if (!path) return;
+  pending.set(path + '/.gitkeep', { type: 'text', content: '' }); openDirs.add(path); selDir = path; renderTree();
+}
+async function newProject() {
+  const name = await dialog({ title: 'New project', text: 'A project is a folder with its own main.tex. What should it be called?', value: 'new-project', ok: 'Create' });
+  const dir = cleanPath(name); if (!dir) return;
+  const path = dir + '/main.tex';
+  if (effective().has(path)) { setStatus(path + ' already exists.', 'err'); return; }
+  pending.set(path, { type: 'text', content: TEMPLATE }); renderTree(); openFile(path);
+}
+function moveEntry(from, to) {      // works for saved and unsaved files
+  const p = pending.get(from);
+  if (p && p.type !== 'delete') pending.set(to, p); else pending.set(to, { type: 'sha', sha: tree.get(from) });
+  if (tree.has(from)) pending.set(from, { type: 'delete' }); else pending.delete(from);
+  if (docs.has(from)) { docs.set(to, docs.get(from)); docs.delete(from); const t = docs.get(to).getValue(); if (originals.get(to) !== t) pending.set(to, { type: 'text', content: t }); }
+  originals.delete(from);
+  if (openPath === from) { openPath = to; $('#edPath').textContent = to; }
+}
+function removeEntry(path) {
+  if (tree.has(path)) pending.set(path, { type: 'delete' }); else pending.delete(path);
+  docs.delete(path);
+  if (openPath === path) closeEditor();
+}
+function closeEditor() { openPath = null; $('#edPath').textContent = 'No file open'; $('#binView').classList.add('hidden'); $('#edEmpty').classList.remove('hidden'); suppress = true; editor.swapDoc(CodeMirror.Doc('')); suppress = false; updateMainInfo(); }
+async function renameFile(path) {
+  const to = cleanPath(await dialog({ title: 'Rename or move', text: 'New name (include a folder to move it)', value: path, ok: 'Rename' }));
+  if (!to || to === path) return;
+  if (effective().has(to)) { setStatus(to + ' already exists.', 'err'); return; }
+  moveEntry(path, to); renderTree();
+}
+async function deleteFile(path) {
+  if (!await dialog({ title: 'Delete ' + baseOf(path) + '?', text: 'It is removed when you next save. Older versions stay in the GitHub history.', ok: 'Delete', danger: true })) return;
+  removeEntry(path); renderTree();
+}
+const under = dir => [...effective().keys()].filter(p => p.startsWith(dir + '/'));
+async function renameDir(dir) {
+  const to = cleanPath(await dialog({ title: 'Rename folder', text: 'New folder name', value: dir, ok: 'Rename' }));
+  if (!to || to === dir) return;
+  if (under(to).length) { setStatus('A folder called ' + to + ' already exists.', 'err'); return; }
+  for (const p of under(dir)) moveEntry(p, to + p.slice(dir.length));
+  if (openDirs.has(dir)) openDirs.add(to); if (selDir === dir) selDir = to; renderTree();
+}
+async function deleteDir(dir) {
+  const list = under(dir);
+  if (!await dialog({ title: 'Delete folder ' + baseOf(dir) + '?', text: 'This removes ' + list.length + ' file(s) when you next save. Older versions stay in the GitHub history.', ok: 'Delete', danger: true })) return;
+  for (const p of list) removeEntry(p); if (selDir === dir) selDir = dirOf(dir); renderTree();
+}
+$('#uploadBtn').onclick = () => $('#uploadInput').click();
+$('#uploadInput').onchange = async e => {
+  for (const f of e.target.files) {
+    const path = join(selDir, f.name), bytes = new Uint8Array(await f.arrayBuffer());
+    if (TEXT_EXT.test(f.name)) { const t = new TextDecoder().decode(bytes); pending.set(path, { type: 'text', content: t }); docs.delete(path); }
+    else pending.set(path, { type: 'b64', content: b64FromBytes(bytes) });
+  }
+  e.target.value = ''; renderTree(); setStatus('Added. Press Save or Compile to keep the upload.');
+};
+
+/* ---------- saving: one commit for everything ---------- */
+async function commitPending() {
+  if (!pending.size) return false;
+  const ref = await ghJson('/git/ref/heads/' + BRANCH);
+  if (ref.object.sha !== headSha) {
+    const go = await dialog({ title: 'Files changed somewhere else', text: 'Your repository was changed from another device or tab since you opened this page. Saving keeps your versions of the files you edited here. Save anyway?', ok: 'Save anyway' });
+    if (!go) throw new Error('Not saved. Reload the page to get the latest files.');
+  }
+  const base = await ghJson('/git/commits/' + ref.object.sha);
+  const snapshot = [...pending], entries = [];
+  for (const [path, p] of snapshot) {
+    if (p.type === 'delete') { entries.push({ path, mode: '100644', type: 'blob', sha: null }); continue; }
+    let sha = p.sha;
+    if (p.type !== 'sha') sha = (await ghJson('/git/blobs', { method: 'POST', body: { content: p.type === 'text' ? b64FromText(p.content) : p.content, encoding: 'base64' } })).sha;
+    entries.push({ path, mode: '100644', type: 'blob', sha });
+  }
+  const names = snapshot.map(([p]) => baseOf(p));
+  const message = 'Edit ' + names.slice(0, 3).join(', ') + (names.length > 3 ? ' and ' + (names.length - 3) + ' more' : '') + ' [skip ci]';
+  const newTree = await ghJson('/git/trees', { method: 'POST', body: { base_tree: base.tree.sha, tree: entries } });
+  const commit = await ghJson('/git/commits', { method: 'POST', body: { message, tree: newTree.sha, parents: [ref.object.sha] } });
+  await gh('/git/refs/heads/' + BRANCH, { method: 'PATCH', body: { sha: commit.sha } });
+  for (const [path, p] of snapshot) {
+    if (pending.get(path) === p) pending.delete(path);          // keep anything typed while saving
+    if (p.type === 'text') originals.set(path, p.content);
+  }
+  await loadTree(); renderTree();
+  return true;
+}
+async function save() {
+  if (busy || !pending.size) return;
+  busy = true; setStatus('Saving…'); renderTree();
+  try { await commitPending(); setStatus('Saved.', 'ok'); } catch (e) { setStatus('Save failed: ' + e.message, 'err'); }
+  busy = false; renderTree();
+}
+
+/* ---------- compiling ---------- */
+function mainTarget() {
+  if (openPath && /\.tex$/i.test(openPath) && docs.has(openPath) && isRootTex(docs.get(openPath).getValue())) return openPath;
+  const mains = JSON.parse(localStorage.getItem('oo_mains') || '{}');
+  let d = openPath ? dirOf(openPath) : selDir;
+  for (;;) { if (mains[d] && effective().has(mains[d])) return mains[d]; if (!d) break; d = dirOf(d); }
+  return null;
+}
+function updateMainInfo() { const t = mainTarget(); $('#mainInfo').textContent = t && t !== openPath ? 'Compile builds ' + t : ''; }
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+async function compile() {
+  if (busy) return;
+  const target = mainTarget();
+  if (!target) { setStatus('Open the main .tex file first (the one with \\documentclass).', 'err'); return; }
+  busy = true; $('#compileBtn').disabled = true; $('#compileBtn').textContent = 'Compiling…'; renderTree();
+  const t0 = Date.now(), tick = setInterval(() => { $('#compileBtn').textContent = 'Compiling… ' + Math.round((Date.now() - t0) / 1000) + 's'; }, 1000);
+  try {
+    if (pending.size) { setStatus('Saving…'); await commitPending(); }
+    const mains = JSON.parse(localStorage.getItem('oo_mains') || '{}'); mains[dirOf(target)] = target; localStorage.setItem('oo_mains', JSON.stringify(mains));
+    setStatus('Starting the compiler…');
+    const before = await ghJson('/actions/workflows/' + WORKFLOW + '/runs?event=workflow_dispatch&per_page=10');
+    const known = new Set(before.workflow_runs.map(r => r.id));
+    await gh('/actions/workflows/' + WORKFLOW + '/dispatches', { method: 'POST', body: { ref: BRANCH, inputs: { file: target } } });
+    let run = null;
+    for (let i = 0; i < 30 && !run; i++) {
+      await sleep(2000);
+      const list = await ghJson('/actions/workflows/' + WORKFLOW + '/runs?event=workflow_dispatch&per_page=10');
+      run = list.workflow_runs.find(r => !known.has(r.id)) || null;
+    }
+    if (!run) throw new Error('The compiler did not start. Try again in a minute.');
+    const friendly = { 'Compile': 'Compiling ' + baseOf(target) + '…', 'Publish PDFs to the pdf branch': 'Saving the PDF…', 'Pick the files to compile': 'Getting ready…' };
+    while (run.status !== 'completed') {
+      await sleep(4000);
+      run = await ghJson('/actions/runs/' + run.id);
+      try {
+        const jobs = await ghJson('/actions/runs/' + run.id + '/jobs');
+        const step = jobs.jobs[0] && jobs.jobs[0].steps && jobs.jobs[0].steps.find(s => s.status === 'in_progress');
+        setStatus(step ? (friendly[step.name] || 'Setting up…') : run.status === 'queued' ? 'Waiting for a free machine…' : 'Working…');
+      } catch (e) {}
+    }
+    await sleep(1500);
+    const secs = Math.round((Date.now() - t0) / 1000);
+    const res = await loadOutput(target, false);
+    if (run.conclusion === 'success') setStatus('Compiled in ' + secs + 's.', 'ok');
+    else if (run.conclusion === 'cancelled') setStatus('That compile was cancelled (a newer one started).', 'err');
+    else { setStatus(res.errors ? 'Finished with ' + res.errors + ' error(s). See the Log tab.' : 'The compile failed. See the Log tab.', 'err'); showTab('log'); if (!res.log) $('#logErrors').innerHTML = '<div class="e">The compiler stopped before LaTeX ran. <a target="_blank" rel="noopener" href="' + run.html_url + '">Open the run on GitHub</a> for details.</div>'; }
+  } catch (e) { setStatus('Compile failed: ' + e.message, 'err'); }
+  clearInterval(tick); busy = false; $('#compileBtn').disabled = false; $('#compileBtn').textContent = '▶ Compile'; renderTree();
+}
+
+/* ---------- PDF and log ---------- */
+let pdfDoc = null, pdfBlobUrl = null, pdfScale = 1, pdfObs = null, pdfGen = 0, shownPdfFor = null;
+async function loadOutput(texPath, quiet) {
+  const stem = texPath.replace(/\.tex$/i, ''), out = { pdf: false, log: false, errors: 0 };
+  shownPdfFor = texPath;
+  try {
+    const r = await gh('/contents/' + encPath(stem + '.pdf') + '?ref=' + PDF_BRANCH, { accept: 'application/vnd.github.raw+json', allow404: true });
+    if (r.status === 404) { if (!pdfDoc || !quiet) showPdfMessage('No PDF yet for ' + baseOf(texPath) + '. Press Compile.'); }
+    else { await showPdf(await r.arrayBuffer(), baseOf(stem) + '.pdf'); out.pdf = true; }
+  } catch (e) { showPdfMessage('Could not load the PDF: ' + e.message); }
+  try {
+    const r = await gh('/contents/' + encPath(stem + '.log') + '?ref=' + PDF_BRANCH, { accept: 'application/vnd.github.raw+json', allow404: true });
+    if (r.status !== 404) { out.log = true; out.errors = showLog(await r.text(), dirOf(texPath)); } else { $('#logErrors').textContent = ''; $('#logRaw').textContent = 'No log yet.'; $('#errCount').classList.add('hidden'); }
+  } catch (e) {}
+  return out;
+}
+function showPdfMessage(msg) { pdfDoc = null; $('#pdfMsg').textContent = msg; if (curTab === 'pdf') { $('#pdfMsg').classList.remove('hidden'); $('#pdfpages').classList.add('hidden'); } $('#dlBtn').removeAttribute('href'); }
+async function showPdf(buf, name) {
+  if (pdfBlobUrl) URL.revokeObjectURL(pdfBlobUrl);
+  pdfBlobUrl = URL.createObjectURL(new Blob([buf], { type: 'application/pdf' }));
+  const dl = $('#dlBtn'); dl.href = pdfBlobUrl; dl.download = name;
+  pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(buf.slice(0)) }).promise;
+  showTab(curTab); await layoutPdf();
+}
+async function layoutPdf() {
+  if (!pdfDoc) return;
+  const gen = ++pdfGen, wrap = $('#pdfpages'), ratio = wrap.scrollHeight ? wrap.scrollTop / wrap.scrollHeight : 0;
+  const first = (await pdfDoc.getPage(1)).getViewport({ scale: 1 });
+  if (gen !== pdfGen) return;
+  if (pdfObs) pdfObs.disconnect();
+  wrap.innerHTML = '';
+  const w = Math.max(200, wrap.clientWidth - 24) * pdfScale, h = w * first.height / first.width;
+  pdfObs = new IntersectionObserver(es => { for (const e of es) if (e.isIntersecting) renderPage(e.target, gen); }, { root: wrap, rootMargin: '800px 0px' });
+  for (let i = 1; i <= pdfDoc.numPages; i++) { const d = document.createElement('div'); d.className = 'page'; d.style.width = w + 'px'; d.style.height = h + 'px'; d.dataset.n = i; wrap.append(d); pdfObs.observe(d); }
+  wrap.scrollTop = ratio * wrap.scrollHeight;
+}
+async function renderPage(div, gen) {
+  if (div.dataset.done || gen !== pdfGen) return; div.dataset.done = '1';
+  const page = await pdfDoc.getPage(+div.dataset.n), v1 = page.getViewport({ scale: 1 }), w = parseFloat(div.style.width);
+  const vp = page.getViewport({ scale: w / v1.width * Math.min(window.devicePixelRatio || 1, 2) });
+  const c = document.createElement('canvas'); c.width = Math.floor(vp.width); c.height = Math.floor(vp.height);
+  div.style.height = (w * v1.height / v1.width) + 'px';
+  await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
+  if (gen === pdfGen) div.append(c);
+}
+function showLog(text, dir) {
+  const errs = [], lines = text.split('\n');
+  for (let i = 0; i < lines.length && errs.length < 40; i++) {
+    let m = lines[i].match(/^(?:\.\/)?([^:\s][^:]*\.(?:tex|sty|cls|ltx|asy)):(\d+): (.*)$/);
+    if (m) errs.push({ file: m[1], line: +m[2], msg: m[3] + (lines[i + 1] && !/^l\.\d/.test(lines[i + 1]) && lines[i + 1].trim() && m[3].length < 60 ? ' ' + lines[i + 1].trim() : '') });
+    else if (/^! /.test(lines[i])) { const l = lines.slice(i, i + 6).join('\n').match(/^l\.(\d+)/m); errs.push({ file: null, line: l ? +l[1] : null, msg: lines[i].slice(2) }); }
+  }
+  const box = $('#logErrors'); box.innerHTML = '';
+  if (!errs.length) { const d = document.createElement('div'); d.className = 'okmsg'; d.textContent = 'No errors found in the log.'; box.append(d); }
+  for (const e of errs) {
+    const d = document.createElement('div'); d.className = 'e';
+    const b = document.createElement('b'); b.textContent = (e.file ? e.file : 'Error') + (e.line ? ', line ' + e.line : '') + ': ';
+    d.append(b, document.createTextNode(e.msg));
+    if (e.file && e.line) d.onclick = () => { const p = join(dir, e.file.replace(/^\.\//, '')); if (effective().has(p)) { openFile(p, e.line); setView('code'); } };
+    box.append(d);
+  }
+  $('#logRaw').textContent = text.length > 400000 ? text.slice(0, 400000) + '\n… (log shortened)' : text;
+  const ec = $('#errCount'); ec.textContent = errs.length; ec.classList.toggle('hidden', !errs.length);
+  return errs.length;
+}
+let curTab = 'pdf';
+function showTab(t) {
+  curTab = t;
+  $('#tabPdf').classList.toggle('on', t === 'pdf'); $('#tabLog').classList.toggle('on', t === 'log');
+  $('#logView').classList.toggle('hidden', t !== 'log');
+  $('#pdfpages').classList.toggle('hidden', t !== 'pdf' || !pdfDoc);
+  $('#pdfMsg').classList.toggle('hidden', t !== 'pdf' || !!pdfDoc);
+}
+$('#tabPdf').onclick = () => { showTab('pdf'); layoutPdf(); };
+$('#tabLog').onclick = () => showTab('log');
+$('#zoomIn').onclick = () => { pdfScale = Math.min(3, pdfScale * 1.2); layoutPdf(); };
+$('#zoomOut').onclick = () => { pdfScale = Math.max(0.4, pdfScale / 1.2); layoutPdf(); };
+
+/* ---------- layout: draggable dividers, small screens ---------- */
+function setView(v) { document.body.dataset.view = v; document.querySelectorAll('#viewTabs button').forEach(b => b.classList.toggle('on', b.dataset.v === v)); if (v === 'code' && editor) editor.refresh(); if (v === 'pdf') layoutPdf(); }
+document.querySelectorAll('#viewTabs button').forEach(b => b.onclick = () => setView(b.dataset.v));
+let relayoutTimer; const relayout = () => { clearTimeout(relayoutTimer); relayoutTimer = setTimeout(() => { if (editor) editor.refresh(); layoutPdf(); }, 200); };
+document.querySelectorAll('.grip').forEach(g => {
+  g.onpointerdown = e => {
+    const el = document.getElementById(g.dataset.target), startX = e.clientX, startW = el.getBoundingClientRect().width;
+    g.classList.add('drag'); g.setPointerCapture(e.pointerId);
+    g.onpointermove = ev => { const w = Math.max(140, startW + ev.clientX - startX); el.style.flex = '0 0 ' + w + 'px'; el.style.width = w + 'px'; };
+    g.onpointerup = () => { g.classList.remove('drag'); g.onpointermove = g.onpointerup = null; relayout(); };
+  };
+});
+window.addEventListener('resize', relayout);
+window.addEventListener('beforeunload', e => { if (pending.size) { e.preventDefault(); e.returnValue = ''; } });
+window.addEventListener('keydown', e => {
+  if (!(e.ctrlKey || e.metaKey)) return;
+  if (e.key === 's') { e.preventDefault(); save(); }
+  if (e.key === 'Enter') { e.preventDefault(); compile(); }
+});
+$('#compileBtn').onclick = compile; $('#saveBtn').onclick = save;
+$('#newFileBtn').onclick = newFile; $('#newFolderBtn').onclick = newFolder; $('#newProjBtn').onclick = newProject;
+
+/* ---------- start ---------- */
+async function start() {
+  setStatus('Loading your files…');
+  try { await loadTree(); } catch (e) {
+    if (e.status === 401 || e.status === 403 || e.status === 404) { showSetup(e.status === 401 ? 'Your access token has expired or was removed. Make a new one.' : 'Could not open the repository: ' + e.message); return; }
+    setStatus('Could not load your files: ' + e.message, 'err'); return;
+  }
+  setStatus(''); renderTree();
+  const last = localStorage.getItem('oo_last');
+  if (last && effective().has(last)) openFile(last);
+}
+pdfjsLib.GlobalWorkerOptions.workerSrc = PDF_WORKER;
+editor = CodeMirror.fromTextArea($('#cm'), { lineNumbers: true, lineWrapping: true, matchBrackets: true, styleActiveLine: true, indentUnit: 2, tabSize: 2, readOnly: true,
+  extraKeys: { Tab: cm => cm.somethingSelected() ? cm.indentSelection('add') : cm.replaceSelection('  ', 'end') } });
+editor.on('change', onEdit);
+cfg = loadCfg();
+if (cfg && cfg.token && cfg.repo) start(); else showSetup();
+</script>
+</body>
+</html>
