@@ -1,0 +1,26 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{asymptote}
+\usepackage[UTF8,fontset=none]{ctex}
+\setCJKmainfont{Noto Serif CJK TC} \setCJKsansfont{Noto Sans CJK TC} \setCJKmonofont{Noto Sans Mono CJK TC}
+\title{中文測試 / 中文测试}
+\author{Lee}
+\date{}
+\begin{document}
+\maketitle
+\section{繁體中文}
+設 $x$ 為實數，若 $|x-3|=5$，求 $x$ 的所有可能值。這是一個關於絕對值與數線距離的練習題。
+\section{简体中文}
+设 $x$ 为实数，若 $|x-3|=5$，求 $x$ 的所有可能值。这是一个关于绝对值与数轴距离的练习题。
+\begin{center}
+\begin{asy}
+size(8cm);
+draw((-3,0)--(9,0), EndArrow(4));
+for (int i=-2; i<=8; ++i) { draw((i,-0.12)--(i,0.12)); label("$"+string(i)+"$",(i,-0.12),S); }
+dot((3,0)); dot((-2,0),red); dot((8,0),red);
+label("距離 $5$",(0.5,0.5),N); label("距离 $5$",(5.5,0.5),N);
+draw((-2,0.4)--(3,0.4),Arrows(3)); draw((3,0.4)--(8,0.4),Arrows(3));
+\end{asy}
+\end{center}
+\end{document}
